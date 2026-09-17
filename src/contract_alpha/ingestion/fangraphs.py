@@ -76,8 +76,9 @@ def extract_tracker_rows(html: str) -> list[dict[str, Any]]:
     for data in _query_data(extract_next_data(html)):
         if (
             isinstance(data, list)
-            and (not data or isinstance(data[0], dict))
-            and (not data or {"playerName", "ContractTotal"}.issubset(data[0]))
+            and data
+            and isinstance(data[0], dict)
+            and {"playerName", "ContractTotal"}.issubset(data[0])
         ):
             return data
     raise SourceFormatError("Free-agent tracker rows were not found")
