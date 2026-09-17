@@ -10,7 +10,7 @@ The research question is whether an unusually strong pre-free-agency season pred
 
 ## Current status
 
-**Phase 1 data audit complete — scoped GO. No application or estimator has been built.**
+**Phase 1 data audit complete — scoped GO. An aggregate feasibility dashboard is built; no estimator has been built.**
 
 The verified public-source design supports a useful 2020–2025 study, not yet the preferred 10–20 offseason study. The audited primary screen contains 471 contracts with guarantees of at least $5 million. Historical public projection coverage is the principal blocker to the projection-based specification.
 
@@ -62,9 +62,20 @@ The $5 million screen was chosen only after examining the distribution. It retai
 
 The audit parser has fixture-based tests that fail loudly when the expected source payload changes. The modeling phase must use rolling or forward temporal validation; random train/test splitting will not be accepted as the sole validation design.
 
-## App
+## Dashboard
 
-Not built. The project brief requires data feasibility to be established before product work.
+The root `streamlit_app.py` is a read-only **Contract Alpha — Data Feasibility Dashboard**. It presents cohort counts, coverage, distributions, eligibility-screen sensitivity, methodology, and limitations from the committed aggregate audit outputs.
+
+It does not run ingestion at startup, expose player-level data, or present model-backed baseball-market findings. "Phase 1—no estimator yet" is explicit throughout the interface.
+
+Run it locally:
+
+```bash
+python3 -m pip install -r requirements.txt
+streamlit run streamlit_app.py
+```
+
+For Streamlit Community Cloud, select repository `zaynr13/contract-alpha`, branch `main`, and entrypoint `streamlit_app.py`.
 
 ## Findings
 
@@ -93,7 +104,7 @@ Python 3.9+ is required.
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-python3 -m pip install -e .
+python3 -m pip install -r requirements.txt
 PYTHONPATH=src python3 scripts/run_data_audit.py
 PYTHONPATH=src python3 -m unittest discover -s tests -v
 ```
@@ -115,5 +126,7 @@ contract-alpha/
 ├── src/contract_alpha/
 │   ├── audit.py
 │   └── ingestion/fangraphs.py
-└── tests/
+├── tests/
+├── requirements.txt
+└── streamlit_app.py
 ```
