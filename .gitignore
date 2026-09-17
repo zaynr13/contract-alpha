@@ -8,6 +8,10 @@ __pycache__/
 data/raw/*
 !data/raw/.gitkeep
 
+# Contract-level research outputs remain local pending redistribution permission.
+data/processed/private/*
+!data/processed/private/.gitkeep
+
 # Local scratch space.
 work/*
 !work/.gitkeep
