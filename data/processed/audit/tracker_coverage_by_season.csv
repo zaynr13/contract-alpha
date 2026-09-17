@@ -1,0 +1,8 @@
+contract_start_year,tracker_rows,signed_rows,complete_contract_rows,guarantee_ge_5m,contract_year_war_present,projection_war_present,crowd_estimate_present
+2020,269,173,156,64,251,0,73
+2021,333,289,213,65,277,0,85
+2022,265,217,164,85,250,0,0
+2023,274,243,170,96,251,0,78
+2024,301,253,183,77,271,0,75
+2025,280,245,192,84,262,0,95
+2026,295,252,203,75,268,249,95

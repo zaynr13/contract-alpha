@@ -1,0 +1,14 @@
+variable,missing_count,signed_rows,missing_percent
+player_id,0,1672,0.0
+player_name,0,1672,0.0
+position,2,1672,0.1
+age,0,1672,0.0
+prior_team,0,1672,0.0
+signing_team,0,1672,0.0
+contract_years,7,1672,0.4
+guaranteed_dollars,389,1672,23.3
+aav,391,1672,23.4
+contract_year_war,132,1672,7.9
+projection_war,1439,1672,86.1
+crowd_years,1206,1672,72.1
+crowd_aav,1206,1672,72.1
