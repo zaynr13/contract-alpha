@@ -34,11 +34,11 @@ That produces 434 primary modelable contracts. Extensions, option modifications,
 For a contract beginning in year `t`, the contract year is `t − 1`. The sustainable baseline is:
 
 ```text
-Baseline WAR = 0.50 × WAR(t−2) + 0.30 × WAR(t−3) + 0.20 × WAR(t−4)
+Baseline WAR = weighted mean of observed WAR(t−2), WAR(t−3), and WAR(t−4)
 Performance spike = contract-year WAR − baseline WAR
 ```
 
-A missing pre-contract MLB season contributes zero seasonal WAR and is separately reflected in the count of observed baseline seasons. The primary model requires at least one observed baseline season.
+The nominal weights are 0.50, 0.30, and 0.20. If a pre-contract MLB row is unobserved, its weight is removed and the remaining weights are renormalized; it is not silently assigned 0.0 WAR. The data separately record unobserved baseline seasons and observed seasons with 0.0 WAR. The primary model requires at least one observed baseline season, and sensitivity models require at least two or all three.
 
 The 2020 season is multiplied by 162/60 when used in signal construction. This makes its counting-stat contribution comparable with a normal season. The exclusion-of-2021 sensitivity removes contracts for which 2020 was the contract year.
 
@@ -47,7 +47,7 @@ The pipeline also decomposes the spike into:
 - a rate component based on WAR per 600 PA for hitters or WAR per 180 IP for pitchers; and
 - a playing-time component based on the change in PA or IP from the weighted baseline.
 
-Percentiles are empirical within hitter/pitcher role. A 93rd-percentile spike means the player's improvement relative to baseline exceeded 93% of free agents in that role.
+Percentiles are empirical within hitter/pitcher role and only among contracts eligible for the performance models. A 93rd-percentile spike means the player's improvement relative to baseline exceeded 93% of the relevant modelable free agents in that role.
 
 ## Pricing benchmark
 
@@ -69,7 +69,7 @@ The AAV and guarantee models beat a role-median baseline. The contract-length mo
 
 ## Market price per WAR
 
-For each signing offseason, the market price of a win is the median winsorized ratio of AAV to sustainable baseline WAR among primary contracts with at least 0.75 baseline WAR. Ratios are capped at the offseason 10th and 90th percentiles before the median is calculated. This avoids imposing one fixed dollar value across the whole study window.
+For each signing offseason, the market price of a win is the median winsorized ratio of AAV to sustainable baseline WAR among primary contracts with at least 0.75 baseline WAR. Ratios are capped at the offseason 10th and 90th percentiles before the median is calculated. This avoids imposing one fixed dollar value across the whole study window. Every value result is recalculated at 75%, 100%, and 125% of these rates, including contract alpha, team totals, category counts, and leaderboard stability.
 
 ## Realized on-field value
 
@@ -97,7 +97,7 @@ The four principal questions are:
 3. Does spike WAR predict realized alpha per elapsed contract year?
 4. Does the sustainable-baseline guarantee residual predict realized alpha per elapsed year?
 
-The second question also reports a persistence model with future WAR per season as the outcome. Its coefficient shows how much of one incremental spike WAR persisted after signing; the regression coefficient equals that persistence estimate minus one.
+The second question also reports a persistence model with future WAR per season as the outcome. Its coefficient is the primary result: how much of one incremental spike WAR persisted after signing. The regression-from-contract-year coefficient equals persistence minus one, so “69% faded” is a transformation of the 31% persistence estimate, not an independent finding.
 
 ## Main results
 
@@ -105,13 +105,17 @@ Primary estimates use 434 contracts unless the forward price residual is require
 
 | Question | Effect estimate | 95% confidence interval | Interpretation |
 |---|---:|---:|---|
-| Spike → guarantee | +0.382 log points | +0.339 to +0.425 | About 46.5% larger guarantee per +1 spike WAR |
-| Spike → regression | −0.693 WAR/year | −0.812 to −0.573 | About 69% of an incremental spike WAR faded relative to the contract year |
-| Spike → persistence | +0.307 WAR/year | +0.188 to +0.427 | Some of the spike carried forward; most did not |
-| Spike → alpha | −$0.925M/year | −$1.752M to −$0.097M | Lower realized on-field return in the primary sample |
-| $10M price residual → alpha | −$0.420M/year | −$0.940M to +$0.101M | Directionally negative but statistically uncertain overall |
+| Spike → guarantee | +0.381 log points | +0.339 to +0.423 | About 46.4% larger guarantee per +1 spike WAR |
+| Spike → persistence | +0.309 WAR/year | +0.189 to +0.429 | About 31% of an incremental spike WAR persisted |
+| Spike → regression | −0.691 WAR/year | −0.811 to −0.571 | Corresponding transformation: about 69% faded |
+| Spike → alpha | −$0.901M/year | −$1.732M to −$0.070M | Lower realized on-field return in the base valuation |
+| $10M baseline-price residual → alpha | −$0.417M/year | −$0.959M to +$0.126M | Directionally negative but statistically uncertain overall |
 
-The alpha result is not robust to every screen: it becomes statistically uncertain after excluding the 2021 signing class. The overpayment result is clear for pitchers but not for hitters. These qualifications are part of the result, not footnotes to it.
+The price and persistence estimates are stable when the analysis requires one, two, or three observed baseline seasons. The alpha estimate is −$0.881M/year with two seasons and −$0.805M/year with three, but the three-season interval crosses zero. At 75%/100%/125% of estimated $/WAR, the alpha estimate is −$1.278M/−$0.901M/−$0.525M per year; the high-scenario interval crosses zero. The alpha result is also uncertain after excluding the 2021 class. Role splits show a clear negative baseline-residual association for pitchers but not hitters. These qualifications are part of the result, not footnotes to it.
+
+## Pricing validation by contract size
+
+Forward guarantee errors rise sharply with deal size. For $100M+ contracts, only 27 forward-scored observations are available; median absolute error is $122.2M, median absolute percentage error is 78.5%, and the empirical prediction interval covers 37.0%. The corresponding figures are materially better for the $5M–<$25M band (262 observations; $5.1M median absolute error; 53.1% median absolute percentage error; 84.0% coverage). Extreme residuals should therefore be read as evidence that the simple benchmark misses important information—not as definitive proof that a club overpaid.
 
 ## Leaderboard definitions
 
@@ -138,6 +142,6 @@ Signing-team totals sum primary-cohort guarantees, elapsed costs, production val
 
 ## Reproduction and public-data boundary
 
-Run `PYTHONPATH=src python3 scripts/run_phase2.py` to rebuild the research outputs. The script writes aggregate results and short transformed leaderboards to `data/processed/phase2/`. The full contract panel and timelines are written to the git-ignored `data/processed/private/` directory.
+Run `PYTHONPATH=src python3 scripts/run_phase2.py` to rebuild the research outputs. The script writes aggregate results and short transformed leaderboards to `data/processed/public/`. The full contract panel and timelines are written to the git-ignored `data/processed/private/` directory.
 
 FanGraphs retains rights in its data and currently restricts unauthorized reproduction and publication. The repository therefore does not commit the complete row-level source-derived panel. Anyone refreshing, redistributing, or commercializing the data should review the current source terms and obtain any required permission.
