@@ -9,11 +9,15 @@ from contract_alpha.ingestion.fangraphs import (
 )
 
 
-def next_page(data):
+def next_page_queries(*data_items):
     payload = {
         "props": {
             "pageProps": {
-                "dehydratedState": {"queries": [{"state": {"data": data}}]}
+                "dehydratedState": {
+                    "queries": [
+                        {"state": {"data": data_item}} for data_item in data_items
+                    ]
+                }
             }
         }
     }
@@ -24,10 +28,22 @@ def next_page(data):
     )
 
 
+def next_page(data):
+    return next_page_queries(data)
+
+
 class ParsingTests(unittest.TestCase):
     def test_extract_tracker_rows(self):
         rows = [{"playerName": "Example", "ContractTotal": 10_000_000}]
         self.assertEqual(extract_tracker_rows(next_page(rows)), rows)
+
+    def test_tracker_ignores_unrelated_empty_query(self):
+        rows = [{"playerName": "Example", "ContractTotal": 10_000_000}]
+        self.assertEqual(extract_tracker_rows(next_page_queries([], rows)), rows)
+
+    def test_empty_tracker_candidate_fails_loudly(self):
+        with self.assertRaises(SourceFormatError):
+            extract_tracker_rows(next_page([]))
 
     def test_extract_leader_rows(self):
         rows = [{"playerid": 123, "Season": 2024, "WAR": 2.0}]
