@@ -19,7 +19,7 @@ def main() -> None:
     parser.add_argument(
         "--public-output-dir",
         type=Path,
-        default=ROOT / "data" / "processed" / "phase2",
+        default=ROOT / "data" / "processed" / "public",
     )
     parser.add_argument(
         "--private-output-dir",
