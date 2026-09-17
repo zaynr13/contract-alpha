@@ -1,0 +1,7 @@
+season,contracts,market_dollars_per_war,p25,p75,method
+2020,50,5391451.10308324,3614595.6903434587,7017495.442690418,median winsorized AAV / sustainable baseline WAR
+2021,54,3916167.13668337,3324771.8685871894,5476828.33424462,median winsorized AAV / sustainable baseline WAR
+2022,59,5247414.796353664,3828195.3332712017,7745566.5922400355,median winsorized AAV / sustainable baseline WAR
+2023,70,6145107.7418800155,4136000.2420023787,9255008.820338538,median winsorized AAV / sustainable baseline WAR
+2024,45,6676033.711014275,4235427.88829973,8652682.683413092,median winsorized AAV / sustainable baseline WAR
+2025,61,6558085.718576202,4286130.454219029,9187632.771927584,median winsorized AAV / sustainable baseline WAR
