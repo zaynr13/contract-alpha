@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build the scoped Contract Alpha research dataset and model outputs."""
+"""Build the scoped MLB Contract-Year Trap research dataset and model outputs."""
 
 from __future__ import annotations
 

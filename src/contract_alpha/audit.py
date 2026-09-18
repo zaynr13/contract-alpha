@@ -1,4 +1,4 @@
-"""Phase 1 feasibility audit for Contract Alpha."""
+"""Phase 1 feasibility audit for MLB Contract-Year Trap."""
 
 from __future__ import annotations
 

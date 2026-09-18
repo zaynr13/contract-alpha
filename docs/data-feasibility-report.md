@@ -1,4 +1,4 @@
-# Contract Alpha — Data Feasibility Report
+# MLB Contract-Year Trap — Data Feasibility Report
 
 Audit date: **2026-09-17**
 

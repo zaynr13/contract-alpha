@@ -12,13 +12,15 @@ ROOT = Path(__file__).resolve().parents[1]
 
 class AppTests(unittest.TestCase):
     def test_research_app_starts_and_renders_findings_product(self):
-        app = AppTest.from_file(str(ROOT / "streamlit_app.py")).run(timeout=20)
+        with tempfile.TemporaryDirectory() as empty_private:
+            with patch.dict(os.environ, {"CONTRACT_ALPHA_PRIVATE_DIR": empty_private}):
+                app = AppTest.from_file(str(ROOT / "streamlit_app.py")).run(timeout=20)
 
         self.assertFalse(app.exception)
         tab_labels = [tab.label for tab in app.tabs]
         self.assertIn("What we found", tab_labels)
         self.assertIn("Contract-Year Trap", tab_labels)
-        self.assertIn("Contract explorer", tab_labels)
+        self.assertIn("Selected contracts", tab_labels)
         self.assertIn("Model checks", tab_labels)
         labels = [metric.label for metric in app.metric]
         self.assertIn("Guarantee benchmark", labels)
@@ -28,11 +30,14 @@ class AppTests(unittest.TestCase):
     def test_headline_cards_are_responsive_and_use_public_summary(self):
         source = (ROOT / "streamlit_app.py").read_text()
         self.assertIn(".finding-grid", source)
-        self.assertIn("@media (max-width: 1100px)", source)
+        self.assertIn("grid-template-columns: repeat(2, minmax(0, 1fr))", source)
+        self.assertIn("overflow-wrap: anywhere", source)
         self.assertIn("@media (max-width: 650px)", source)
 
         app = AppTest.from_file(str(ROOT / "streamlit_app.py")).run(timeout=20)
         rendered = "\n".join(item.value for item in app.markdown)
+        self.assertIn("MLB Contract-Year Trap", rendered)
+        self.assertIn("Do teams pay for sustainable talent—or the perfect contract year?", rendered)
         self.assertIn("4 · Baseline-price residual", rendered)
         self.assertIn("31% persisted", rendered)
         self.assertIn("How to read these results", rendered)

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the Phase 1 Contract Alpha data feasibility audit."""
+"""Run the Phase 1 MLB Contract-Year Trap data feasibility audit."""
 
 from __future__ import annotations
 

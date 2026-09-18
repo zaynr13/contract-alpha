@@ -1,8 +1,8 @@
-# Contract Alpha
+# MLB Contract-Year Trap
 
-**Did teams pay for sustainable talent—or for the perfect contract year?**
+**Do teams pay for sustainable talent—or the perfect contract year?**
 
-Contract Alpha treats an MLB free-agent contract as a capital-allocation decision:
+MLB Contract-Year Trap treats an MLB free-agent contract as a capital-allocation decision:
 
 > **performance → price → return**
 
@@ -31,7 +31,7 @@ The analysis is descriptive. It does not assume or claim that contract-year perf
 
 ## Why it matters
 
-An MLB club committing $50 million, $150 million, or $300 million is making a large investment under uncertainty. Recent performance may contain genuine information, noise, changed playing time, or all three. Contract Alpha connects the player signal to the price paid and the return subsequently realized rather than stopping at salary prediction.
+An MLB club committing $50 million, $150 million, or $300 million is making a large investment under uncertainty. Recent performance may contain genuine information, noise, changed playing time, or all three. MLB Contract-Year Trap connects the player signal to the price paid and the return subsequently realized rather than stopping at salary prediction.
 
 ## Data
 
@@ -55,7 +55,7 @@ The pipeline also separates rate-performance from playing-time change, normalize
 
 A **Contract-Year Trap** is a transparent descriptive label: top-quintile spike plus negative realized alpha. Every label is accompanied by the underlying WAR, contract, cost, and value numbers.
 
-## Contract Alpha
+## Realized on-field contract alpha
 
 ```text
 On-field contract alpha = modeled value of realized WAR − elapsed contract cost

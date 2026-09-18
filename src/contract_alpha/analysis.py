@@ -1,4 +1,4 @@
-"""Phase 2–6 analytical pipeline for Contract Alpha.
+"""Phase 2–6 analytical pipeline for MLB Contract-Year Trap.
 
 The module keeps source ingestion separate from model construction. Public outputs are
 aggregate research results and short derived leaderboards; the contract-level research
