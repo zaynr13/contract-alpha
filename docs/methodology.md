@@ -1,8 +1,8 @@
-# Contract Alpha methodology
+# MLB Contract-Year Trap methodology
 
 ## Research design
 
-Contract Alpha studies MLB free-agent contracts as capital-allocation decisions:
+MLB Contract-Year Trap studies MLB free-agent contracts as capital-allocation decisions:
 
 ```text
 pre-signing performance → contract price → realized on-field return
