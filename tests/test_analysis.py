@@ -9,6 +9,7 @@ from contract_alpha.analysis import (
     add_forward_price_predictions,
     aggregate_player_seasons,
     build_contract_panel,
+    make_contract_size_validation,
     salary_elapsed_factor,
     season_length_factor,
 )
@@ -92,7 +93,100 @@ class AnalysisTests(unittest.TestCase):
         result = add_contract_alpha(panel, rates).iloc[0]
         self.assertEqual(result["realized_production_value"], -6_000_000)
         self.assertEqual(result["contract_alpha"], -16_000_000)
+        self.assertEqual(result["contract_alpha_low"], -14_500_000)
+        self.assertEqual(result["contract_alpha_high"], -17_500_000)
         self.assertEqual(result["classification"], "Contract-year trap")
+
+    def test_unobserved_baseline_seasons_are_not_silently_zero(self):
+        contracts = pd.DataFrame(
+            [{
+                "ContractId": 11,
+                "playerId": "2",
+                "playerName": "Sparse History",
+                "position": "OF",
+                "role": "hitter",
+                "age": 28,
+                "season": 2025,
+                "team_prev": "OLD",
+                "team_new": "NEW",
+                "contract_years": 1,
+                "ContractTotal": 6_000_000,
+                "aav": 6_000_000,
+                "ContractType": "Free Agent",
+                "option_type": "",
+                "has_complete_contract": True,
+            }]
+        )
+        performance = pd.DataFrame(
+            [
+                {"playerid": "2", "Season": 2021, "WAR": 3.0, "PA": 600, "IP": 0, "wRC+": 110, "FIP-": np.nan},
+                {"playerid": "2", "Season": 2024, "WAR": 4.0, "PA": 600, "IP": 0, "wRC+": 120, "FIP-": np.nan},
+                {"playerid": "2", "Season": 2025, "WAR": 1.0, "PA": 300, "IP": 0, "wRC+": 100, "FIP-": np.nan},
+            ]
+        )
+        panel, _ = build_contract_panel(contracts, performance)
+        row = panel.iloc[0]
+        self.assertEqual(row["baseline_observed_seasons"], 1)
+        self.assertEqual(row["baseline_unobserved_seasons"], 2)
+        self.assertAlmostEqual(row["baseline_war"], 3.0)
+        self.assertAlmostEqual(row["performance_spike"], 1.0)
+
+    def test_spike_percentile_excludes_unobserved_contract_year(self):
+        contracts = pd.DataFrame(
+            [
+                {
+                    "ContractId": contract_id,
+                    "playerId": str(contract_id),
+                    "playerName": f"Player {contract_id}",
+                    "position": "OF",
+                    "role": "hitter",
+                    "age": 28,
+                    "season": 2025,
+                    "team_prev": "OLD",
+                    "team_new": "NEW",
+                    "contract_years": 1,
+                    "ContractTotal": 6_000_000,
+                    "aav": 6_000_000,
+                    "ContractType": "Free Agent",
+                    "option_type": "",
+                    "has_complete_contract": True,
+                }
+                for contract_id in (21, 22)
+            ]
+        )
+        performance = pd.DataFrame(
+            [
+                {"playerid": str(player_id), "Season": season, "WAR": war, "PA": 600, "IP": 0, "wRC+": 100, "FIP-": np.nan}
+                for player_id, season, war in [
+                    (21, 2023, 1.0),
+                    (21, 2024, 3.0),
+                    (22, 2023, 2.0),
+                ]
+            ]
+        )
+        panel, _ = build_contract_panel(contracts, performance)
+        observed = panel.loc[panel["contract_id"].eq(21)].iloc[0]
+        unobserved = panel.loc[panel["contract_id"].eq(22)].iloc[0]
+        self.assertEqual(observed["spike_percentile"], 100.0)
+        self.assertTrue(np.isnan(unobserved["spike_percentile"]))
+
+    def test_contract_size_validation_reports_all_bands(self):
+        panel = pd.DataFrame(
+            {
+                "guaranteed_dollars": [2e6, 10e6, 50e6, 150e6],
+                "predicted_guarantee": [1.5e6, 8e6, 40e6, 80e6],
+                "predicted_guarantee_low": [1e6, 5e6, 20e6, 50e6],
+                "predicted_guarantee_high": [3e6, 15e6, 70e6, 120e6],
+                "guarantee_outside_empirical_range": [False, False, False, True],
+            }
+        )
+        result = make_contract_size_validation(panel)
+        self.assertEqual(len(result), 4)
+        self.assertEqual(result["n"].sum(), 4)
+        self.assertEqual(
+            result.loc[result["contract_size_band"].eq("$100M+"), "empirical_interval_coverage_percent"].iloc[0],
+            0.0,
+        )
 
     def test_price_features_are_pre_signing_only_and_validation_is_forward(self):
         forbidden = ("contract_year", "future", "post_", "realized")

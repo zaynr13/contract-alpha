@@ -236,8 +236,8 @@ Proceed only if the master-table build can demonstrate all of the following:
 
 ## Bottom line
 
-The project clears the data gate for a serious **recent-era, baseline-based** study. It does not yet clear the gate for the full historical and projection-rich version. The honest next step is Phase 2 on the 2020–2025 cohort while pursuing authorized historical projections and annual cash-flow data in parallel—not frontend development.
+The audit cleared the data gate for a serious **recent-era, baseline-based** study, which the repository subsequently implemented for the 2020–2025 cohort. It still does not clear the gate for a longer historical, projection-rich, cash-flow-precise version; that extension requires authorized projections and structured annual contract terms.
 
-## Phase 1 dashboard boundary
+## Current product boundary
 
-After this audit cleared the scoped data gate, the repository added a read-only aggregate feasibility dashboard. The dashboard visualizes only the committed tables described in this report. It does not fetch source data at startup, expose player-level records, implement an estimator, or make a baseball-market claim. This interface is a transparent view of the audit—not a substitute for Phase 2 construction and validation.
+This report records the Phase 1 data gate. The repository has since completed the scoped Phase 2 analysis. The hosted app uses only committed aggregate results and short transformed leaderboards; it does not fetch source data or train models at startup. The complete row-level contract explorer is available only after a local pipeline run because the underlying source-derived panel is not redistributed publicly.

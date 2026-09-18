@@ -10,7 +10,7 @@ It tests whether a player who surged immediately before free agency received a l
 
 ## Current status
 
-**Phase 2–8 complete for a scoped 2020–2025 study.** The repository now contains the contract/performance panel builder, contract-year signal, temporally validated pricing benchmarks, realized-alpha valuation, formal research tests, sensitivity analyses, tests, documentation, and a findings-led Streamlit product.
+**The scoped 2020–2025 study is complete.** The repository contains the contract/performance panel builder, contract-year signal, temporally validated pricing benchmarks, realized-alpha valuation, formal research tests, sensitivity analyses, tests, documentation, and a findings-led Streamlit product.
 
 The public app reads precomputed transformed outputs; it does not scrape or train at startup. The full contract-level panel remains local and git-ignored pending source-data redistribution permission.
 
@@ -25,7 +25,7 @@ The study answers four linked questions:
 1. Does a contract-year performance spike predict a larger guarantee?
 2. Does that spike predict subsequent performance regression?
 3. Does it predict lower realized on-field contract alpha?
-4. Does model-estimated overpayment predict lower realized alpha?
+4. Does a larger baseline-price residual predict lower realized alpha?
 
 The analysis is descriptive. It does not assume or claim that contract-year performance causes a club to overpay.
 
@@ -51,7 +51,7 @@ The signal is not raw contract-year WAR. It compares the contract year with a 50
 Performance spike = contract-year WAR − sustainable baseline WAR
 ```
 
-The pipeline also separates rate-performance from playing-time change, normalizes 2020 counting statistics to a 162-game equivalent, and computes empirical spike percentiles within hitter/pitcher role.
+The pipeline also separates rate-performance from playing-time change, normalizes 2020 counting statistics to a 162-game equivalent, and computes empirical spike percentiles only within the eligible hitter/pitcher model cohort. Missing pre-contract rows are not assigned zero WAR: baseline weights are renormalized over observed rows, and unobserved seasons remain distinct from observed 0.0-WAR seasons.
 
 A **Contract-Year Trap** is a transparent descriptive label: top-quintile spike plus negative realized alpha. Every label is accompanied by the underlying WAR, contract, cost, and value numbers.
 
@@ -69,7 +69,7 @@ This is **on-field** alpha—not team profit. It excludes commercial revenue, po
 
 Pricing benchmarks are ridge regressions using only sustainable, pre-signing information: baseline production, rate production, playing-time share, age, role, and offseason. Contract-year performance is deliberately excluded so the residual represents price relative to a sustainable baseline.
 
-Research regressions include baseline WAR, age, age², role, and offseason fixed effects; alpha models also control for contract length. Standard errors are clustered by player. Results are repeated across guarantee screens, excluding the 2021 class, and separately for hitters and pitchers.
+Research regressions include baseline WAR, age, age², role, and offseason fixed effects; alpha models also control for contract length. Standard errors are clustered by player. Results are repeated across guarantee screens, excluding the 2021 class, separately for hitters and pitchers, with one/two/three observed baseline seasons, and at 75%/100%/125% of the estimated market price per WAR.
 
 The complete specification is in [docs/methodology.md](docs/methodology.md).
 
@@ -79,9 +79,9 @@ Each offseason is predicted only from earlier offseasons. There is no random era
 
 | Target | Forward MAE | Role-median MAE | Result |
 |---|---:|---:|---|
-| AAV | $4.06M | $5.24M | Beats baseline |
-| Guarantee | $14.95M | $17.21M | Beats baseline |
-| Contract years | 0.74 years | 0.65 years | **Fails baseline** |
+| AAV | $4.05M | $5.24M | Beats baseline |
+| Guarantee | $14.96M | $17.21M | Beats baseline |
+| Contract years | 0.73 years | 0.65 years | **Fails baseline** |
 
 Because contract length fails the simple baseline, the app does not present its predictions as decision-useful. Guarantee intervals are wide and are described as historical benchmarks—not precise player appraisals.
 
@@ -98,7 +98,7 @@ The Streamlit app leads with the actual baseball-market findings, then provides:
 - expanding-window model validation; and
 - complete method and limitation notes.
 
-The hosted version exposes only transformed research outputs and short leaderboards. Running the pipeline locally enables the complete contract explorer.
+The hosted version exposes only transformed research outputs and curated short leaderboards under **Selected contracts**. It does not provide a searchable player database. Running the pipeline locally creates the rights-restricted panel and enables the complete **Contract explorer**.
 
 ```bash
 python3 -m pip install -r requirements.txt
@@ -109,12 +109,12 @@ streamlit run streamlit_app.py
 
 In the 434-contract primary modelable cohort:
 
-- One additional contract-year spike WAR is associated with a **46.5% larger guarantee** (95% CI: 40.4% to 52.9%).
-- Only **0.307 WAR per future season** of that incremental spike persists. Relative to the contract year, the estimate is **−0.693 WAR per season** (95% CI: −0.812 to −0.573).
-- One additional spike WAR is associated with **−$0.925 million of realized alpha per elapsed contract year** (95% CI: −$1.752M to −$0.097M).
-- Each $10 million sustainable-baseline guarantee premium is associated with **−$0.420 million of alpha per year**, but the overall interval crosses zero (95% CI: −$0.940M to +$0.101M).
+- One additional contract-year spike WAR is associated with a **46.4% larger guarantee** (95% interval after transforming the log coefficient: about 40.4% to 52.7%).
+- **31% persisted:** one additional spike WAR is associated with 0.309 WAR per future season (95% CI: 0.189 to 0.429). The corresponding transformation is that about 69% faded relative to the contract year; this is not a second independent estimate.
+- One additional spike WAR is associated with **−$0.901 million of realized alpha per elapsed contract year** (95% CI: −$1.732M to −$0.070M) in the base valuation.
+- Each $10 million baseline-price residual is associated with **−$0.417 million of alpha per year**, but the interval crosses zero (95% CI: −$0.959M to +$0.126M).
 
-The return result weakens when the 2021 class is excluded. The overpayment relationship is clear for pitchers but not hitters. The honest conclusion is therefore narrower than “teams irrationally overpay”: the market strongly priced recent spikes, most of the incremental spike faded, and return damage is most evident in pitcher contracts and the primary specification.
+The price and persistence estimates remain similar when two or three observed baseline seasons are required. The alpha association is negative in all three baseline-history specifications, but its interval crosses zero with three full seasons. It is also uncertain after excluding the 2021 class and under the high (+25%) $/WAR scenario. The baseline-price residual is a model diagnostic—not a fair-value estimate or proof of overpayment. The defensible conclusion is narrow: the market strongly priced recent spikes, most of the incremental spike did not persist, and the base valuation associates larger spikes with weaker realized on-field returns.
 
 ## Limitations
 
@@ -125,6 +125,7 @@ The return result weakens when the 2021 class is excluded. The overpayment relat
 - WAR and $/WAR are modeled on-field value, not literal revenue.
 - Postseason production and star commercial value are excluded.
 - The pricing model improves population-level error but remains imprecise for individual stars.
+- Guarantee validation is especially weak for $100M+ deals (27 observations; $122.2M median absolute error; 37.0% empirical interval coverage).
 - The results are associations, not causal estimates of front-office bias.
 - Source rights limit public redistribution of the full row-level panel.
 
@@ -141,15 +142,14 @@ PYTHONPATH=src python3 scripts/run_phase2.py
 PYTHONPATH=src python3 -m unittest discover -s tests -v
 ```
 
-`run_phase2.py` writes public aggregate outputs to `data/processed/phase2/` and the full local research panel to the ignored `data/processed/private/` directory.
+`run_phase2.py` writes public aggregate and transformed outputs to `data/processed/public/` and the full local research panel to the ignored `data/processed/private/` directory.
 
 ## Repository map
 
 ```text
 contract-alpha/
 ├── data/processed/
-│   ├── audit/                  # Phase 1 aggregate outputs
-│   ├── phase2/                 # public research results and leaderboards
+│   ├── public/                 # committed aggregates and transformed leaderboards
 │   └── private/                # local row-level panel; git-ignored
 ├── docs/
 │   ├── data-feasibility-report.md

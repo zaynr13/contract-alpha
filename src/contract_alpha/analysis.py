@@ -36,6 +36,9 @@ SHORTENED_SEASON = 2020
 SHORTENED_GAMES = 60
 FULL_SEASON_GAMES = 162
 BASELINE_WEIGHTS = (0.50, 0.30, 0.20)
+MARKET_VALUE_SCENARIOS = {"low": 0.75, "base": 1.00, "high": 1.25}
+CONTRACT_SIZE_BINS = (1_000_000, 5_000_000, 25_000_000, 100_000_000, math.inf)
+CONTRACT_SIZE_LABELS = ("$1M–<$5M", "$5M–<$25M", "$25M–<$100M", "$100M+")
 MODEL_FEATURES = (
     "baseline_war",
     "baseline_rate_war",
@@ -152,8 +155,22 @@ def _normalized_line(line: SeasonLine, season: int) -> SeasonLine:
     )
 
 
-def _weighted(values: list[float], weights: tuple[float, ...] = BASELINE_WEIGHTS) -> float:
-    return float(sum(weight * value for weight, value in zip(weights, values)))
+def _weighted_observed(
+    values: list[float],
+    observed: list[bool],
+    weights: tuple[float, ...] = BASELINE_WEIGHTS,
+) -> float:
+    """Weight observed seasons only, renormalizing rather than imputing missing rows as zero."""
+
+    included = [
+        (value, weight)
+        for value, is_observed, weight in zip(values, observed, weights)
+        if is_observed and math.isfinite(value)
+    ]
+    if not included:
+        return math.nan
+    weight_total = sum(weight for _, weight in included)
+    return float(sum(value * weight for value, weight in included) / weight_total)
 
 
 def build_contract_panel(
@@ -202,8 +219,11 @@ def build_contract_panel(
             if playing_time > 0:
                 rate_values.append((line.war / playing_time * standard_playing_time, BASELINE_WEIGHTS[lag - 1]))
 
-        baseline_war = _weighted(baseline_wars)
-        baseline_playing_time = _weighted(baseline_playing_times)
+        baseline_observed = [line.observed for line in baseline_lines]
+        baseline_war = _weighted_observed(baseline_wars, baseline_observed)
+        baseline_playing_time = _weighted_observed(
+            baseline_playing_times, baseline_observed
+        )
         if rate_values:
             weight_total = sum(weight for _, weight in rate_values)
             baseline_rate_war = sum(value * weight for value, weight in rate_values) / weight_total
@@ -265,7 +285,11 @@ def build_contract_panel(
             "aav": float(contract.aav),
             "is_primary": bool(float(contract.ContractTotal) >= PRIMARY_THRESHOLD_DOLLARS),
             "contract_year_observed": raw_contract_line.observed,
-            "baseline_observed_seasons": sum(line.observed for line in baseline_lines),
+            "baseline_observed_seasons": sum(baseline_observed),
+            "baseline_unobserved_seasons": 3 - sum(baseline_observed),
+            "baseline_observed_zero_war_seasons": sum(
+                line.observed and abs(line.war) < 1e-12 for line in baseline_lines
+            ),
             "contract_year_war": contract_line.war,
             "contract_year_playing_time": contract_playing_time,
             "baseline_war": baseline_war,
@@ -279,6 +303,7 @@ def build_contract_panel(
             "contract_year_fip_minus": contract_line.fip_minus,
             "elapsed_contract_seasons": len(elapsed_seasons),
             "post_seasons_observed": post_observed,
+            "post_seasons_without_mlb_row": len(elapsed_seasons) - post_observed,
             "realized_war": realized_war,
             "normalized_realized_war": normalized_realized_war,
             "future_war_per_season": future_war_per_season,
@@ -314,7 +339,18 @@ def build_contract_panel(
     panel = pd.DataFrame(panel_rows)
     if panel.empty:
         return panel, pd.DataFrame(timeline_rows)
-    panel["spike_percentile"] = panel.groupby("role")["performance_spike"].rank(pct=True) * 100
+    panel["spike_percentile"] = math.nan
+    percentile_eligible = (
+        panel["contract_year_observed"]
+        & panel["baseline_observed_seasons"].ge(1)
+        & panel["role"].isin(["hitter", "pitcher"])
+    )
+    panel.loc[percentile_eligible, "spike_percentile"] = (
+        panel.loc[percentile_eligible]
+        .groupby("role")["performance_spike"]
+        .rank(pct=True)
+        * 100
+    )
     return panel, pd.DataFrame(timeline_rows)
 
 
@@ -423,16 +459,84 @@ def add_forward_price_predictions(panel: pd.DataFrame) -> tuple[pd.DataFrame, pd
                 }
             )
 
-    result["aav_price_premium"] = result["aav"] - result["predicted_aav"]
-    result["guarantee_price_premium"] = (
+    result["aav_baseline_residual"] = result["aav"] - result["predicted_aav"]
+    result["guarantee_baseline_residual"] = (
         result["guaranteed_dollars"] - result["predicted_guarantee"]
     )
-    result["guarantee_premium_percent"] = np.where(
+    result["guarantee_baseline_residual_percent"] = np.where(
         result["predicted_guarantee"].gt(0),
-        100 * result["guarantee_price_premium"] / result["predicted_guarantee"],
+        100 * result["guarantee_baseline_residual"] / result["predicted_guarantee"],
         math.nan,
     )
+    result["guarantee_actual_to_benchmark_ratio"] = np.where(
+        result["predicted_guarantee"].gt(0),
+        result["guaranteed_dollars"] / result["predicted_guarantee"],
+        math.nan,
+    )
+    result["guarantee_outside_empirical_range"] = (
+        result["predicted_guarantee"].notna()
+        & (
+            result["guaranteed_dollars"].lt(result["predicted_guarantee_low"])
+            | result["guaranteed_dollars"].gt(result["predicted_guarantee_high"])
+        )
+    )
+    result["guarantee_benchmark_reliability"] = "not scored"
+    scored = result["predicted_guarantee"].notna()
+    far_outside = scored & (
+        result["guarantee_outside_empirical_range"]
+        | result["guarantee_actual_to_benchmark_ratio"].gt(3)
+        | result["guarantee_actual_to_benchmark_ratio"].lt(1 / 3)
+    )
+    result.loc[scored & ~far_outside, "guarantee_benchmark_reliability"] = (
+        "within modeled range"
+    )
+    result.loc[far_outside, "guarantee_benchmark_reliability"] = (
+        "outside reliable modeled range"
+    )
     return result, pd.DataFrame(validations)
+
+
+def make_contract_size_validation(panel: pd.DataFrame) -> pd.DataFrame:
+    """Summarize forward guarantee error by actual contract-size band."""
+
+    scored = panel[panel["predicted_guarantee"].notna()].copy()
+    scored["contract_size_band"] = pd.cut(
+        scored["guaranteed_dollars"],
+        bins=CONTRACT_SIZE_BINS,
+        labels=CONTRACT_SIZE_LABELS,
+        right=False,
+    )
+    scored["absolute_error"] = (
+        scored["guaranteed_dollars"] - scored["predicted_guarantee"]
+    ).abs()
+    scored["absolute_percentage_error"] = (
+        100 * scored["absolute_error"] / scored["guaranteed_dollars"]
+    )
+    scored["absolute_log_error"] = (
+        np.log1p(scored["guaranteed_dollars"])
+        - np.log1p(scored["predicted_guarantee"])
+    ).abs()
+    rows: list[dict[str, Any]] = []
+    for band in CONTRACT_SIZE_LABELS:
+        group = scored[scored["contract_size_band"].astype("string").eq(band)]
+        if group.empty:
+            continue
+        rows.append(
+            {
+                "contract_size_band": band,
+                "n": int(len(group)),
+                "mae": float(group["absolute_error"].mean()),
+                "median_absolute_error": float(group["absolute_error"].median()),
+                "median_absolute_percentage_error": float(
+                    group["absolute_percentage_error"].median()
+                ),
+                "mean_absolute_log_error": float(group["absolute_log_error"].mean()),
+                "empirical_interval_coverage_percent": float(
+                    100 * (~group["guarantee_outside_empirical_range"]).mean()
+                ),
+            }
+        )
+    return pd.DataFrame(rows)
 
 
 def estimate_market_price_per_war(panel: pd.DataFrame) -> pd.DataFrame:
@@ -462,7 +566,7 @@ def estimate_market_price_per_war(panel: pd.DataFrame) -> pd.DataFrame:
 
 
 def add_contract_alpha(panel: pd.DataFrame, market_rates: pd.DataFrame) -> pd.DataFrame:
-    """Value realized production and subtract elapsed AAV-based cost."""
+    """Value realized production under low, base, and high market-$-per-WAR cases."""
 
     result = panel.copy()
     rates = market_rates.set_index("season")["market_dollars_per_war"].to_dict()
@@ -474,16 +578,28 @@ def add_contract_alpha(panel: pd.DataFrame, market_rates: pd.DataFrame) -> pd.Da
         ):
             total += float(getattr(row, f"post_war_y{number}", 0.0)) * float(rates[season])
         production_values.append(total)
-    result["realized_production_value"] = production_values
-    result["contract_alpha"] = result["realized_production_value"] - result["realized_cost"]
-    result["alpha_roi_percent"] = np.where(
-        result["realized_cost"].gt(0), 100 * result["contract_alpha"] / result["realized_cost"], math.nan
-    )
-    result["alpha_per_equivalent_year"] = np.where(
-        result["equivalent_salary_years"].gt(0),
-        result["contract_alpha"] / result["equivalent_salary_years"],
-        math.nan,
-    )
+    base_production = pd.Series(production_values, index=result.index)
+    for scenario, multiplier in MARKET_VALUE_SCENARIOS.items():
+        production_column = f"realized_production_value_{scenario}"
+        alpha_column = f"contract_alpha_{scenario}"
+        roi_column = f"alpha_roi_percent_{scenario}"
+        per_year_column = f"alpha_per_equivalent_year_{scenario}"
+        result[production_column] = base_production * multiplier
+        result[alpha_column] = result[production_column] - result["realized_cost"]
+        result[roi_column] = np.where(
+            result["realized_cost"].gt(0),
+            100 * result[alpha_column] / result["realized_cost"],
+            math.nan,
+        )
+        result[per_year_column] = np.where(
+            result["equivalent_salary_years"].gt(0),
+            result[alpha_column] / result["equivalent_salary_years"],
+            math.nan,
+        )
+    result["realized_production_value"] = result["realized_production_value_base"]
+    result["contract_alpha"] = result["contract_alpha_base"]
+    result["alpha_roi_percent"] = result["alpha_roi_percent_base"]
+    result["alpha_per_equivalent_year"] = result["alpha_per_equivalent_year_base"]
     result["cost_per_war"] = np.where(
         result["realized_war"].gt(0), result["realized_cost"] / result["realized_war"], math.nan
     )
@@ -528,25 +644,37 @@ def make_team_results(panel: pd.DataFrame) -> pd.DataFrame:
 
     primary = panel[panel["is_primary"]].copy()
     primary["has_price_prediction"] = primary["predicted_guarantee"].notna().astype(int)
-    grouped = (
-        primary.groupby("signing_team", as_index=False)
-        .agg(
-            contracts=("contract_id", "size"),
-            total_guarantee=("guaranteed_dollars", "sum"),
-            realized_cost=("realized_cost", "sum"),
-            realized_production_value=("realized_production_value", "sum"),
-            contract_alpha=("contract_alpha", "sum"),
-            price_prediction_contracts=("has_price_prediction", "sum"),
-            total_guarantee_price_premium=("guarantee_price_premium", "sum"),
+    aggregations: dict[str, tuple[str, str]] = {
+        "contracts": ("contract_id", "size"),
+        "total_guarantee": ("guaranteed_dollars", "sum"),
+        "realized_cost": ("realized_cost", "sum"),
+        "price_prediction_contracts": ("has_price_prediction", "sum"),
+        "total_guarantee_baseline_residual": ("guarantee_baseline_residual", "sum"),
+    }
+    for scenario in MARKET_VALUE_SCENARIOS:
+        aggregations[f"realized_production_value_{scenario}"] = (
+            f"realized_production_value_{scenario}",
+            "sum",
         )
-        .sort_values("contract_alpha", ascending=False)
-    )
-    grouped["alpha_roi_percent"] = np.where(
-        grouped["realized_cost"].gt(0),
-        100 * grouped["contract_alpha"] / grouped["realized_cost"],
-        math.nan,
-    )
-    grouped["alpha_per_contract"] = grouped["contract_alpha"] / grouped["contracts"]
+        aggregations[f"contract_alpha_{scenario}"] = (
+            f"contract_alpha_{scenario}",
+            "sum",
+        )
+    grouped = primary.groupby("signing_team", as_index=False).agg(**aggregations)
+    for scenario in MARKET_VALUE_SCENARIOS:
+        grouped[f"alpha_roi_percent_{scenario}"] = np.where(
+            grouped["realized_cost"].gt(0),
+            100 * grouped[f"contract_alpha_{scenario}"] / grouped["realized_cost"],
+            math.nan,
+        )
+        grouped[f"alpha_per_contract_{scenario}"] = (
+            grouped[f"contract_alpha_{scenario}"] / grouped["contracts"]
+        )
+    grouped["realized_production_value"] = grouped["realized_production_value_base"]
+    grouped["contract_alpha"] = grouped["contract_alpha_base"]
+    grouped["alpha_roi_percent"] = grouped["alpha_roi_percent_base"]
+    grouped["alpha_per_contract"] = grouped["alpha_per_contract_base"]
+    grouped = grouped.sort_values("contract_alpha", ascending=False)
     return grouped
 
 
@@ -610,7 +738,9 @@ def run_research_models(panel: pd.DataFrame) -> pd.DataFrame:
     prepared["log_aav"] = np.log(prepared["aav"])
     prepared["log_guarantee"] = np.log(prepared["guaranteed_dollars"])
     prepared["alpha_per_year_m"] = prepared["alpha_per_equivalent_year"] / 1_000_000
-    prepared["guarantee_premium_per_10m"] = prepared["guarantee_price_premium"] / 10_000_000
+    prepared["guarantee_baseline_residual_per_10m"] = (
+        prepared["guarantee_baseline_residual"] / 10_000_000
+    )
 
     questions = [
         ("A_price", "log_guarantee", "performance_spike", base_controls),
@@ -627,7 +757,12 @@ def run_research_models(panel: pd.DataFrame) -> pd.DataFrame:
             base_controls + ["elapsed_contract_seasons"],
         ),
         ("C_alpha", "alpha_per_year_m", "performance_spike", base_controls + ["contract_years"]),
-        ("D_overpay", "alpha_per_year_m", "guarantee_premium_per_10m", base_controls + ["contract_years"]),
+        (
+            "D_residual",
+            "alpha_per_year_m",
+            "guarantee_baseline_residual_per_10m",
+            base_controls + ["contract_years"],
+        ),
     ]
     specifications = [
         ("primary", 5_000_000, False, "all"),
@@ -649,7 +784,7 @@ def run_research_models(panel: pd.DataFrame) -> pd.DataFrame:
         if role != "all":
             cohort = cohort[cohort["role"].eq(role)]
         for question, outcome, focal, controls in questions:
-            if question == "D_overpay":
+            if question == "D_residual":
                 question_cohort = cohort[cohort["predicted_guarantee"].notna()]
             else:
                 question_cohort = cohort
@@ -673,6 +808,114 @@ def run_research_models(panel: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def run_baseline_history_sensitivity(panel: pd.DataFrame) -> pd.DataFrame:
+    """Repeat principal models with one, two, and three observed baseline seasons."""
+
+    prepared = panel.copy()
+    prepared["age_squared"] = prepared["age"].pow(2)
+    prepared["is_pitcher"] = prepared["role"].eq("pitcher").astype(float)
+    prepared["log_guarantee"] = np.log(prepared["guaranteed_dollars"])
+    prepared["alpha_per_year_m"] = prepared["alpha_per_equivalent_year"] / 1_000_000
+    base_controls = ["baseline_war", "age", "age_squared", "is_pitcher"]
+    questions = [
+        ("A_price", "log_guarantee", base_controls),
+        (
+            "B_persistence",
+            "future_war_per_season",
+            base_controls + ["elapsed_contract_seasons"],
+        ),
+        ("C_alpha", "alpha_per_year_m", base_controls + ["contract_years"]),
+    ]
+    rows: list[dict[str, Any]] = []
+    for minimum_seasons in (1, 2, 3):
+        cohort = prepared[
+            prepared["is_primary"]
+            & prepared["contract_year_observed"]
+            & prepared["baseline_observed_seasons"].ge(minimum_seasons)
+            & prepared["role"].isin(["hitter", "pitcher"])
+        ]
+        for question, outcome, controls in questions:
+            rows.append(
+                {
+                    "question": question,
+                    "minimum_observed_baseline_seasons": minimum_seasons,
+                    "outcome": outcome,
+                    "focal_variable": "performance_spike",
+                    **_cluster_ols(
+                        cohort,
+                        outcome=outcome,
+                        focal="performance_spike",
+                        controls=controls,
+                    ),
+                }
+            )
+    return pd.DataFrame(rows)
+
+
+def run_market_value_sensitivity(panel: pd.DataFrame, limit: int = 10) -> pd.DataFrame:
+    """Test alpha results and leaderboard stability across ±25% market-WAR values."""
+
+    prepared = panel.copy()
+    prepared["age_squared"] = prepared["age"].pow(2)
+    prepared["is_pitcher"] = prepared["role"].eq("pitcher").astype(float)
+    cohort = prepared[
+        prepared["is_primary"]
+        & prepared["contract_year_observed"]
+        & prepared["baseline_observed_seasons"].ge(1)
+        & prepared["role"].isin(["hitter", "pitcher"])
+    ].copy()
+    mature = cohort[cohort["equivalent_salary_years"].ge(1)].copy()
+    base_controls = ["baseline_war", "age", "age_squared", "is_pitcher", "contract_years"]
+
+    def leaderboard_sets(frame: pd.DataFrame, alpha_column: str) -> dict[str, set[int]]:
+        high_spike = frame["spike_percentile"].ge(80)
+        traps = frame[high_spike & frame[alpha_column].lt(0)].nsmallest(limit, alpha_column)
+        return {
+            "traps": set(traps["contract_id"].astype(int)),
+            "value_destruction": set(
+                frame.nsmallest(limit, alpha_column)["contract_id"].astype(int)
+            ),
+            "positive_alpha": set(
+                frame.nlargest(limit, alpha_column)["contract_id"].astype(int)
+            ),
+        }
+
+    base_sets = leaderboard_sets(mature, "contract_alpha_base")
+    rows: list[dict[str, Any]] = []
+    for scenario, multiplier in MARKET_VALUE_SCENARIOS.items():
+        alpha_column = f"contract_alpha_{scenario}"
+        outcome = f"alpha_per_year_m_{scenario}"
+        cohort[outcome] = cohort[f"alpha_per_equivalent_year_{scenario}"] / 1_000_000
+        result = _cluster_ols(
+            cohort,
+            outcome=outcome,
+            focal="performance_spike",
+            controls=base_controls,
+        )
+        scenario_sets = leaderboard_sets(mature, alpha_column)
+        rows.append(
+            {
+                "scenario": scenario,
+                "market_value_multiplier": multiplier,
+                "negative_alpha_contracts": int(mature[alpha_column].lt(0).sum()),
+                "contract_year_traps": int(
+                    (mature["spike_percentile"].ge(80) & mature[alpha_column].lt(0)).sum()
+                ),
+                "trap_top10_overlap_with_base": len(
+                    scenario_sets["traps"] & base_sets["traps"]
+                ),
+                "value_destruction_top10_overlap_with_base": len(
+                    scenario_sets["value_destruction"] & base_sets["value_destruction"]
+                ),
+                "positive_alpha_top10_overlap_with_base": len(
+                    scenario_sets["positive_alpha"] & base_sets["positive_alpha"]
+                ),
+                **result,
+            }
+        )
+    return pd.DataFrame(rows)
+
+
 def _evidence_label(row: pd.Series, expected_direction: int) -> str:
     estimate = float(row["estimate"])
     low = float(row["ci_low"])
@@ -689,7 +932,11 @@ def _evidence_label(row: pd.Series, expected_direction: int) -> str:
 def make_leaderboards(panel: pd.DataFrame, limit: int = 10) -> dict[str, list[dict[str, Any]]]:
     """Return short, transformed result tables suitable for public presentation."""
 
-    primary = panel[panel["is_primary"] & panel["contract_year_observed"]].copy()
+    primary = panel[
+        panel["is_primary"]
+        & panel["contract_year_observed"]
+        & panel["baseline_observed_seasons"].ge(1)
+    ].copy()
     columns = [
         "player_name",
         "signing_team",
@@ -703,11 +950,16 @@ def make_leaderboards(panel: pd.DataFrame, limit: int = 10) -> dict[str, list[di
         "spike_percentile",
         "future_war_per_season",
         "predicted_guarantee",
-        "guarantee_price_premium",
+        "predicted_guarantee_low",
+        "predicted_guarantee_high",
+        "guarantee_baseline_residual",
+        "guarantee_benchmark_reliability",
         "realized_war",
         "realized_production_value",
         "realized_cost",
         "contract_alpha",
+        "contract_alpha_low",
+        "contract_alpha_high",
         "alpha_roi_percent",
         "classification",
     ]
@@ -723,7 +975,9 @@ def make_leaderboards(panel: pd.DataFrame, limit: int = 10) -> dict[str, list[di
         "positive_alpha": records(mature.nlargest(limit, "contract_alpha")),
         "value_destruction": records(mature.nsmallest(limit, "contract_alpha")),
         "contract_year_spikes": records(primary.nlargest(limit, "performance_spike")),
-        "pricing_premiums": records(priced.nlargest(limit, "guarantee_price_premium")),
+        "largest_baseline_price_residuals": records(
+            priced.nlargest(limit, "guarantee_baseline_residual")
+        ),
         "contract_year_traps": records(traps.nsmallest(limit, "contract_alpha")),
     }
 
@@ -733,6 +987,9 @@ def make_analysis_summary(
     research: pd.DataFrame,
     validation: pd.DataFrame,
     market_rates: pd.DataFrame,
+    baseline_sensitivity: pd.DataFrame,
+    market_sensitivity: pd.DataFrame,
+    size_validation: pd.DataFrame,
 ) -> dict[str, Any]:
     primary = panel[panel["is_primary"]]
     modelable = primary[
@@ -747,7 +1004,7 @@ def make_analysis_summary(
         "B_regression": -1,
         "B_persistence": 1,
         "C_alpha": -1,
-        "D_overpay": -1,
+        "D_residual": -1,
     }
     for question, direction in expected.items():
         row = main.loc[question]
@@ -776,21 +1033,37 @@ def make_analysis_summary(
             "primary_contracts_ge_5m": int(len(primary)),
             "primary_modelable_contracts": int(len(modelable)),
             "forward_priced_primary_contracts": int(primary["predicted_guarantee"].notna().sum()),
+            "primary_with_two_baseline_seasons": int(
+                modelable["baseline_observed_seasons"].ge(2).sum()
+            ),
+            "primary_with_three_baseline_seasons": int(
+                modelable["baseline_observed_seasons"].eq(3).sum()
+            ),
         },
         "answers": answers,
         "validation": model_validation,
         "market_price_per_war": json.loads(market_rates.round(2).to_json(orient="records")),
+        "market_value_sensitivity": json.loads(
+            market_sensitivity.round(4).to_json(orient="records")
+        ),
+        "baseline_history_sensitivity": json.loads(
+            baseline_sensitivity.round(4).to_json(orient="records")
+        ),
+        "contract_size_validation": json.loads(
+            size_validation.round(4).to_json(orient="records")
+        ),
         "method": {
-            "spike": "162-game-equivalent contract-year WAR minus 50/30/20 prior-three-season WAR",
+            "spike": "162-game-equivalent contract-year WAR minus a 50/30/20 prior-three-season baseline renormalized over observed MLB rows",
             "price_model": "ridge regression using sustainable pre-contract baseline features; strictly forward offseason testing",
             "inference": "OLS with offseason fixed effects and player-clustered standard errors",
             "alpha": "realized WAR times offseason-specific market $/WAR minus AAV-based elapsed cost",
             "shortened_2020": "WAR and playing time scaled to 162 games for signal models; 2020 cost prorated 60/162 for realized alpha",
+            "market_value_sensitivity": "realized alpha repeated at 75%, 100%, and 125% of the empirical offseason market $/WAR estimate",
         },
         "interpretation": {
             "price_estimate": "The guarantee coefficient is a conditional association, not a causal return to one additional WAR.",
-            "regression_estimate": "The regression coefficient measures future WAR per season minus contract-year WAR; the persistence coefficient reports the share of a spike that carries forward.",
-            "price_prediction": "Expected price is a sustainable-baseline benchmark with a wide empirical interval, not a precise fair-value appraisal for an individual player.",
+            "persistence_estimate": "The persistence coefficient is the primary finding: the share of one additional spike WAR associated with future WAR per season. The percentage that faded is one minus this estimate, not a separate model.",
+            "price_prediction": "The predicted guarantee is a sustainable-baseline benchmark with a wide empirical interval, not a fair-value appraisal or proof that a club overpaid.",
             "years_prediction": "Contract-length predictions are reported for validation transparency but should not be used because they did not beat the role-median baseline.",
         },
         "limitations": [
@@ -798,6 +1071,7 @@ def make_analysis_summary(
             "Market $/WAR is estimated from recent free-agent AAV divided by sustainable baseline WAR.",
             "The six-offseason window is short; results are descriptive, not causal.",
             "Historical public projections are unavailable, so expected performance uses a transparent historical baseline.",
+            "Unobserved baseline rows are not imputed as zero; observed baseline weights are renormalized, and results are repeated for one, two, and three observed seasons.",
             "WAR measures on-field contribution, not commercial or total financial value.",
         ],
     }
@@ -824,19 +1098,35 @@ def run_phase2(public_output_dir: Path, private_output_dir: Path) -> dict[str, A
     contracts, performance = fetch_phase2_inputs()
     panel, timeline = build_contract_panel(contracts, performance)
     panel, validation = add_forward_price_predictions(panel)
+    size_validation = make_contract_size_validation(panel)
     market_rates = estimate_market_price_per_war(panel)
     panel = add_contract_alpha(panel, market_rates)
     timeline = add_timeline_values(timeline, panel, market_rates)
     research = run_research_models(panel)
+    baseline_sensitivity = run_baseline_history_sensitivity(panel)
+    market_sensitivity = run_market_value_sensitivity(panel)
     leaderboards = make_leaderboards(panel)
     team_results = make_team_results(panel)
-    summary = make_analysis_summary(panel, research, validation, market_rates)
+    summary = make_analysis_summary(
+        panel,
+        research,
+        validation,
+        market_rates,
+        baseline_sensitivity,
+        market_sensitivity,
+        size_validation,
+    )
 
     public_output_dir.mkdir(parents=True, exist_ok=True)
     private_output_dir.mkdir(parents=True, exist_ok=True)
     research.to_csv(public_output_dir / "research_results.csv", index=False)
     validation.to_csv(public_output_dir / "model_validation.csv", index=False)
+    size_validation.to_csv(public_output_dir / "contract_size_validation.csv", index=False)
     market_rates.to_csv(public_output_dir / "market_price_per_war.csv", index=False)
+    market_sensitivity.to_csv(public_output_dir / "market_value_sensitivity.csv", index=False)
+    baseline_sensitivity.to_csv(
+        public_output_dir / "baseline_history_sensitivity.csv", index=False
+    )
     team_results.to_csv(public_output_dir / "team_results.csv", index=False)
     (public_output_dir / "analysis_summary.json").write_text(
         json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8"

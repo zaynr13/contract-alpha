@@ -4,14 +4,13 @@ __pycache__/
 .venv/
 .DS_Store
 
-# Source payloads are reproducible downloads and may be subject to source terms.
-data/raw/*
-!data/raw/.gitkeep
+# Source payloads and local audit products may be subject to source terms.
+data/raw/
+data/external/
+data/processed/audit/
 
 # Contract-level research outputs remain local pending redistribution permission.
-data/processed/private/*
-!data/processed/private/.gitkeep
+data/processed/private/
 
 # Local scratch space.
-work/*
-!work/.gitkeep
+work/

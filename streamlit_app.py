@@ -12,7 +12,7 @@ import streamlit as st
 
 
 ROOT = Path(__file__).resolve().parent
-PHASE2_DIR = ROOT / "data" / "processed" / "phase2"
+PUBLIC_DIR = ROOT / "data" / "processed" / "public"
 PRIVATE_DIR = Path(
     os.environ.get("CONTRACT_ALPHA_PRIVATE_DIR", ROOT / "data" / "processed" / "private")
 )
@@ -58,7 +58,8 @@ def leaderboard_frame(records: list[dict]) -> pd.DataFrame:
             "Guarantee": frame["guaranteed_dollars"].map(money),
             "Spike WAR": frame["performance_spike"].map(lambda value: f"{value:+.1f}"),
             "Future WAR/yr": frame["future_war_per_season"].map(lambda value: f"{value:.1f}"),
-            "Baseline-price residual": frame["guarantee_price_premium"].map(money),
+            "Baseline-price residual": frame["guarantee_baseline_residual"].map(money),
+            "Model range": frame["guarantee_benchmark_reliability"],
             "Realized WAR": frame["realized_war"].map(lambda value: f"{value:.1f}"),
             "Alpha": frame["contract_alpha"].map(money),
             "ROI": frame["alpha_roi_percent"].map(lambda value: f"{value:+.0f}%"),
@@ -66,18 +67,19 @@ def leaderboard_frame(records: list[dict]) -> pd.DataFrame:
     )
 
 
-def team_frame(frame: pd.DataFrame) -> pd.DataFrame:
+def team_frame(frame: pd.DataFrame, scenario: str) -> pd.DataFrame:
+    suffix = scenario.lower()
     return pd.DataFrame(
         {
             "Team": frame["signing_team"],
             "Contracts": frame["contracts"],
             "Priced deals": frame["price_prediction_contracts"],
             "Guarantees": frame["total_guarantee"].map(money),
-            "Baseline-price residual": frame["total_guarantee_price_premium"].map(money),
+            "Baseline-price residual": frame["total_guarantee_baseline_residual"].map(money),
             "Elapsed cost": frame["realized_cost"].map(money),
-            "Production value": frame["realized_production_value"].map(money),
-            "Realized alpha": frame["contract_alpha"].map(money),
-            "Alpha ROI": frame["alpha_roi_percent"].map(lambda value: f"{value:+.0f}%"),
+            "Production value": frame[f"realized_production_value_{suffix}"].map(money),
+            "Realized alpha": frame[f"contract_alpha_{suffix}"].map(money),
+            "Alpha ROI": frame[f"alpha_roi_percent_{suffix}"].map(lambda value: f"{value:+.0f}%"),
         }
     )
 
@@ -93,35 +95,42 @@ st.markdown(
     .dek { color: #bec8d1; font-size: 1.16rem; line-height: 1.6; max-width: 59rem; }
     .scope { display: inline-block; margin-top: 1rem; padding: .38rem .72rem; border: 1px solid #ffb34d80; border-radius: 999px; color: #ffd59e; background: #ffb34d10; font-size: .78rem; font-weight: 750; }
     .finding { min-height: 8.7rem; padding: 1rem 1.05rem; border: 1px solid #293846; border-radius: 14px; background: #121b24cc; }
+    .finding-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1rem; }
     .finding-kicker { color: #8ea1b2; font-size: .74rem; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; }
     .finding-value { color: #f5f1e8; font-size: 1.65rem; font-weight: 760; margin: .3rem 0; }
     .finding-copy { color: #b9c4cd; font-size: .86rem; line-height: 1.45; }
     .callout { border-left: 3px solid #ffb34d; padding: .85rem 1rem; background: #ffb34d0b; color: #dce2e7; }
     [data-testid="stMetric"] { background: #121b24cc; border: 1px solid #293846; border-radius: 14px; padding: .9rem; }
     div[data-testid="stExpander"] { border-color: #293846; }
+    @media (max-width: 1100px) { .finding-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    @media (max-width: 650px) { .finding-grid { grid-template-columns: 1fr; } .finding { min-height: auto; } }
     </style>
     """,
     unsafe_allow_html=True,
 )
 
 try:
-    summary = load_json(PHASE2_DIR / "analysis_summary.json")
-    leaderboards = load_json(PHASE2_DIR / "leaderboards.json")
-    research = load_csv(PHASE2_DIR / "research_results.csv")
-    validation = load_csv(PHASE2_DIR / "model_validation.csv")
-    market = load_csv(PHASE2_DIR / "market_price_per_war.csv")
-    teams = load_csv(PHASE2_DIR / "team_results.csv")
+    summary = load_json(PUBLIC_DIR / "analysis_summary.json")
+    leaderboards = load_json(PUBLIC_DIR / "leaderboards.json")
+    research = load_csv(PUBLIC_DIR / "research_results.csv")
+    validation = load_csv(PUBLIC_DIR / "model_validation.csv")
+    market = load_csv(PUBLIC_DIR / "market_price_per_war.csv")
+    teams = load_csv(PUBLIC_DIR / "team_results.csv")
+    market_sensitivity = load_csv(PUBLIC_DIR / "market_value_sensitivity.csv")
+    baseline_sensitivity = load_csv(PUBLIC_DIR / "baseline_history_sensitivity.csv")
+    size_validation = load_csv(PUBLIC_DIR / "contract_size_validation.csv")
 except (FileNotFoundError, json.JSONDecodeError, pd.errors.ParserError) as exc:
     st.error(f"The committed research outputs could not be loaded: {exc}")
     st.stop()
 
 answers = summary["answers"]
 price = answers["A_price"]
-regression = answers["B_regression"]
 persistence = answers["B_persistence"]
 alpha = answers["C_alpha"]
-overpay = answers["D_overpay"]
+residual = answers["D_residual"]
 price_percent = 100 * (math.exp(price["estimate"]) - 1)
+persistence_percent = 100 * persistence["estimate"]
+faded_percent = 100 - persistence_percent
 
 st.markdown('<div class="eyebrow">MLB free-agent pricing and returns</div>', unsafe_allow_html=True)
 st.markdown('<div class="hero">Contract Alpha</div>', unsafe_allow_html=True)
@@ -132,12 +141,11 @@ st.markdown(
     unsafe_allow_html=True,
 )
 st.markdown(
-    f'<div class="scope">PHASE 2 · {summary["cohort"]["primary_modelable_contracts"]:,} MODELABLE DEALS · REALIZED THROUGH 2025</div>',
+    f'<div class="scope">2020–2025 STUDY · {summary["cohort"]["primary_modelable_contracts"]:,} MODELABLE DEALS · REALIZED THROUGH 2025</div>',
     unsafe_allow_html=True,
 )
 
 st.write("")
-finding_columns = st.columns(4, gap="medium")
 finding_cards = [
     (
         "1 · Price",
@@ -145,9 +153,10 @@ finding_cards = [
         f"per +1 WAR contract-year spike, conditional on baseline, age, role and offseason. {interval(price, percent=True)}",
     ),
     (
-        "2 · Regression",
-        f"{regression['estimate']:+.2f} WAR/year",
-        f"relative to the contract year for each +1 WAR spike. Only {persistence['estimate']:.2f} WAR/year persisted. {interval(regression)}",
+        "2 · Persistence",
+        f"{persistence_percent:.0f}% persisted",
+        f"of each +1 WAR spike per future season. The corresponding fade is {faded_percent:.0f}%. "
+        f"95% CI {100 * persistence['ci_low']:.1f}% to {100 * persistence['ci_high']:.1f}% · n={persistence['n']:,}",
     ),
     (
         "3 · Realized alpha",
@@ -155,26 +164,39 @@ finding_cards = [
         f"for each +1 WAR spike. The primary estimate is negative, but sensitive to the 2021 screen. {interval(alpha, money_units=True)}",
     ),
     (
-        "4 · Overpayment",
-        f"{overpay['estimate']:+.2f} $M/year",
-        f"per $10M baseline-price premium. Directionally negative, but inconclusive overall. {interval(overpay, money_units=True)}",
+        "4 · Baseline-price residual",
+        f"{residual['estimate']:+.2f} $M/year",
+        f"per $10M above the sustainable-baseline benchmark. Directionally negative, but inconclusive overall. {interval(residual, money_units=True)}",
     ),
 ]
-for column, (kicker, value, copy) in zip(finding_columns, finding_cards):
-    with column:
-        st.markdown(
-            f'<div class="finding"><div class="finding-kicker">{kicker}</div>'
-            f'<div class="finding-value">{value}</div><div class="finding-copy">{copy}</div></div>',
-            unsafe_allow_html=True,
-        )
+cards_html = "".join(
+    f'<div class="finding"><div class="finding-kicker">{kicker}</div>'
+    f'<div class="finding-value">{value}</div><div class="finding-copy">{copy}</div></div>'
+    for kicker, value, copy in finding_cards
+)
+st.markdown(f'<div class="finding-grid">{cards_html}</div>', unsafe_allow_html=True)
 
 st.caption(
     "Associations are descriptive, not causal. Confidence intervals use player-clustered standard errors; all models include offseason fixed effects."
 )
+st.markdown("### How to read these results")
+st.markdown(
+    """
+    - **Sustainable baseline:** a 50/30/20 weighted history of observed pre-contract MLB seasons; missing rows are not silently assigned zero WAR.
+    - **Contract-year spike:** contract-year WAR minus that sustainable baseline.
+    - **Realized on-field alpha:** realized WAR valued at the base-case offseason market $/WAR, minus approximate elapsed AAV cost.
+    - **Baseline-price residual:** actual guarantee minus a pre-signing historical benchmark. It is a model residual—not proof that a club irrationally overpaid.
+    """
+)
 st.divider()
 
+has_private_explorer = (
+    (PRIVATE_DIR / "contract_research_panel.csv").exists()
+    and (PRIVATE_DIR / "contract_timelines.csv").exists()
+)
+contracts_tab_label = "Contract explorer" if has_private_explorer else "Selected contracts"
 findings_tab, traps_tab, explorer_tab, validation_tab, method_tab = st.tabs(
-    ["What we found", "Contract-Year Trap", "Contract explorer", "Model checks", "Method & limits"]
+    ["What we found", "Contract-Year Trap", contracts_tab_label, "Model checks", "Method & limits"]
 )
 
 with findings_tab:
@@ -184,8 +206,9 @@ with findings_tab:
         st.write(
             f"A one-WAR contract-year spike was associated with a **{price_percent:.1f}% larger "
             f"guarantee**, holding the player's prior baseline, age, role and signing offseason "
-            f"constant. After signing, only **{persistence['estimate']:.2f} WAR per season** of "
-            "that incremental spike persisted; the rest mean-reverted relative to the contract year."
+            f"constant. After signing, **{persistence_percent:.0f}% of the incremental spike "
+            f"persisted**. The corresponding **{faded_percent:.0f}% faded** is simply one minus "
+            "that persistence estimate—not a separate model."
         )
         st.write(
             f"The same one-WAR spike was associated with **{money(abs(alpha['estimate']) * 1_000_000, 2)} "
@@ -209,13 +232,13 @@ with findings_tab:
 
     st.subheader("Does the result survive reasonable alternatives?")
     sensitivity = research[
-        research["question"].isin(["A_price", "B_regression", "C_alpha", "D_overpay"])
+        research["question"].isin(["A_price", "B_persistence", "C_alpha", "D_residual"])
     ].copy()
     labels = {
         "A_price": "Spike → log guarantee",
-        "B_regression": "Spike → regression",
+        "B_persistence": "Spike → future WAR/year",
         "C_alpha": "Spike → alpha/year ($M)",
-        "D_overpay": "Premium → alpha/year ($M)",
+        "D_residual": "Baseline-price residual → alpha/year ($M)",
     }
     sensitivity["Question"] = sensitivity["question"].map(labels)
     sensitivity["Screen"] = sensitivity["specification"].replace(
@@ -236,6 +259,57 @@ with findings_tab:
         hide_index=True,
         width="stretch",
     )
+
+    robustness_left, robustness_right = st.columns(2, gap="large")
+    with robustness_left:
+        st.markdown("#### Baseline-history sensitivity")
+        baseline_table = baseline_sensitivity.copy()
+        baseline_table["Result"] = baseline_table.apply(
+            lambda row: f"{row['estimate']:+.3f} [{row['ci_low']:+.3f}, {row['ci_high']:+.3f}]",
+            axis=1,
+        )
+        baseline_table["Question"] = baseline_table["question"].map(
+            {
+                "A_price": "Price",
+                "B_persistence": "Persistence",
+                "C_alpha": "Alpha/year",
+            }
+        )
+        st.dataframe(
+            baseline_table[["Question", "minimum_observed_baseline_seasons", "Result", "n"]].rename(
+                columns={"minimum_observed_baseline_seasons": "Min. seasons", "n": "N"}
+            ),
+            hide_index=True,
+            width="stretch",
+        )
+        st.caption(
+            "Price and persistence barely move. The alpha estimate remains negative with all three "
+            "baseline seasons, but its 95% interval crosses zero."
+        )
+    with robustness_right:
+        st.markdown("#### Market-value sensitivity")
+        market_table = market_sensitivity.copy()
+        market_table["Assumption"] = market_table["scenario"].map(
+            {"low": "75% of base", "base": "Base case", "high": "125% of base"}
+        )
+        market_table["Spike → alpha/year"] = market_table.apply(
+            lambda row: f"{row['estimate']:+.3f} [{row['ci_low']:+.3f}, {row['ci_high']:+.3f}]",
+            axis=1,
+        )
+        market_table["Trap top-10 overlap"] = market_table[
+            "trap_top10_overlap_with_base"
+        ].map(lambda value: f"{int(value)}/10")
+        st.dataframe(
+            market_table[["Assumption", "Spike → alpha/year", "contract_year_traps", "Trap top-10 overlap"]].rename(
+                columns={"contract_year_traps": "Trap contracts"}
+            ),
+            hide_index=True,
+            width="stretch",
+        )
+        st.caption(
+            "The coefficient stays negative in all three cases, but becomes statistically uncertain "
+            "when each WAR is valued 25% above the base estimate."
+        )
 
 with traps_tab:
     st.subheader("Contract-Year Trap leaderboard")
@@ -259,13 +333,18 @@ with traps_tab:
         "Largest value destruction": "value_destruction",
         "Best realized alpha": "positive_alpha",
         "Biggest spikes": "contract_year_spikes",
-        "Largest baseline-price residual": "pricing_premiums",
+        "Largest baseline-price residual": "largest_baseline_price_residuals",
     }[board_choice]
     st.dataframe(leaderboard_frame(leaderboards[board_key]), hide_index=True, width="stretch")
     st.caption(
         "Alpha = realized FanGraphs WAR × estimated signing-offseason $/WAR − AAV-based elapsed cost. "
         "A negative WAR season reduces production value; it is not floored at zero."
     )
+    if board_choice == "Largest baseline-price residual":
+        st.warning(
+            "Large residuals—especially for superstar contracts—often fall outside the model's "
+            "reliable range. They are benchmark misses, not definitive evidence of overpayment."
+        )
     st.subheader("Team capital allocation")
     st.write(
         "Team totals aggregate primary-screen free-agent deals and their realized-to-date on-field "
@@ -276,14 +355,22 @@ with traps_tab:
         ["Highest alpha", "Lowest alpha", "Largest baseline-price residual"],
         horizontal=True,
     )
+    team_scenario = st.selectbox(
+        "WAR valuation assumption",
+        ["Base", "Low", "High"],
+        help="Low and high value every WAR at 75% and 125% of the base estimate.",
+    )
+    scenario_suffix = team_scenario.lower()
     team_sort_rules = {
-        "Highest alpha": ("contract_alpha", False),
-        "Lowest alpha": ("contract_alpha", True),
-        "Largest baseline-price residual": ("total_guarantee_price_premium", False),
+        "Highest alpha": (f"contract_alpha_{scenario_suffix}", False),
+        "Lowest alpha": (f"contract_alpha_{scenario_suffix}", True),
+        "Largest baseline-price residual": ("total_guarantee_baseline_residual", False),
     }
     sort_column, ascending = team_sort_rules[team_sort]
     ranked_teams = teams.sort_values(sort_column, ascending=ascending)
-    st.dataframe(team_frame(ranked_teams), hide_index=True, width="stretch")
+    st.dataframe(
+        team_frame(ranked_teams, team_scenario), hide_index=True, width="stretch"
+    )
     st.caption(
         "The baseline-price residual is actual guarantee minus the pre-signing sustainable-baseline "
         "benchmark. It is available only for contracts with an earlier-offseason training set."
@@ -292,7 +379,7 @@ with traps_tab:
 with explorer_tab:
     panel_path = PRIVATE_DIR / "contract_research_panel.csv"
     timeline_path = PRIVATE_DIR / "contract_timelines.csv"
-    if panel_path.exists() and timeline_path.exists():
+    if has_private_explorer:
         panel = load_csv(panel_path)
         timelines = load_csv(timeline_path)
         primary_panel = panel[panel["is_primary"].astype(bool)].copy()
@@ -318,8 +405,9 @@ with explorer_tab:
             ][["season", "war"]].set_index("season")
             st.line_chart(timeline, color="#ffb34d")
             st.caption(
-                f"Contract year: {int(selected['contract_year'])}. Missing MLB seasons are omitted from the line; "
-                "they contribute zero realized MLB WAR."
+                f"Contract year: {int(selected['contract_year'])}. A season without an MLB leaderboard row is "
+                "omitted from the line and contributes zero realized MLB WAR after a successful source query; "
+                "it remains distinct from an observed 0.0-WAR season."
             )
         with detail_side:
             st.markdown("#### Deal economics")
@@ -331,8 +419,10 @@ with explorer_tab:
             details = pd.DataFrame(
                 {
                     "Measure": [
-                        "Sustainable-baseline price",
+                        "Sustainable-baseline guarantee benchmark",
                         "Empirical 80% interval",
+                        "Baseline-price residual",
+                        "Benchmark reliability",
                         "Elapsed cost",
                         "Realized production value",
                         "Alpha ROI",
@@ -341,6 +431,8 @@ with explorer_tab:
                     "Value": [
                         expected,
                         expected_range,
+                        money(selected["guarantee_baseline_residual"]),
+                        selected["guarantee_benchmark_reliability"],
                         money(selected["realized_cost"]),
                         money(selected["realized_production_value"]),
                         f"{selected['alpha_roi_percent']:+.1f}%",
@@ -350,8 +442,8 @@ with explorer_tab:
             )
             st.dataframe(details, hide_index=True, width="stretch")
             st.caption(
-                "Expected price is a broad historical-baseline benchmark—not a precise appraisal. "
-                "Star contracts can fall outside its already-wide interval."
+                "This is a broad historical benchmark—not a fair-value appraisal or proof of "
+                "irrational pricing. Star contracts can fall outside its already-wide interval."
             )
         st.markdown("#### Elapsed contract cash flow")
         cashflow = timelines[
@@ -369,11 +461,11 @@ with explorer_tab:
         )
         st.dataframe(cashflow_table, hide_index=True, width="stretch")
     else:
-        st.subheader("Public contract explorer")
+        st.subheader("Selected contracts")
         st.info(
-            "The full row-level explorer is available when the pipeline is run locally. The hosted "
-            "app publishes only transformed findings and short leaderboards while source-data "
-            "redistribution permission remains unresolved."
+            "This hosted view is a curated set of transformed contract results, not a searchable "
+            "full-dataset explorer. The complete player, team, and offseason explorer is local-only "
+            "while source-data redistribution permission remains unresolved."
         )
         st.dataframe(leaderboard_frame(leaderboards["contract_year_traps"]), hide_index=True, width="stretch")
 
@@ -414,10 +506,44 @@ with validation_tab:
             hide_index=True,
             width="stretch",
         )
+    st.markdown("#### Guarantee error by actual contract size")
+    size_table = size_validation.copy()
+    size_table["MAE"] = size_table["mae"].map(lambda value: money(value, 2))
+    size_table["Median error"] = size_table["median_absolute_error"].map(
+        lambda value: money(value, 2)
+    )
+    size_table["Median % error"] = size_table[
+        "median_absolute_percentage_error"
+    ].map(lambda value: f"{value:.1f}%")
+    size_table["Interval coverage"] = size_table[
+        "empirical_interval_coverage_percent"
+    ].map(lambda value: f"{value:.1f}%")
+    st.dataframe(
+        size_table[
+            [
+                "contract_size_band",
+                "n",
+                "MAE",
+                "Median error",
+                "Median % error",
+                "mean_absolute_log_error",
+                "Interval coverage",
+            ]
+        ].rename(
+            columns={
+                "contract_size_band": "Actual guarantee",
+                "n": "N",
+                "mean_absolute_log_error": "Mean abs. log error",
+            }
+        ),
+        hide_index=True,
+        width="stretch",
+    )
     st.warning(
         "The guarantee model improves on a simple baseline at the population level, but individual "
-        "intervals are wide and superstar deals are difficult to price. Contract-length predictions "
-        "failed the baseline and are excluded from the explorer."
+        "performance is poor for \\$100M+ contracts: their MAE exceeds \\$150M and fewer than 40% fall "
+        "inside the empirical interval. Extreme superstar residuals are not reliable appraisals. "
+        "Contract-length predictions failed the baseline and are excluded from decision-useful outputs."
     )
 
 with method_tab:
@@ -429,12 +555,14 @@ with method_tab:
             #### Contract-year spike
 
             Contract-year WAR minus a **50% / 30% / 20% weighted** average of the prior three
-            seasons. The pipeline also separates rate-performance and playing-time components.
+            seasons. Weights are renormalized over observed MLB rows; an unobserved row is not
+            silently converted to zero. The pipeline also separates rate and playing-time components.
 
             #### Realized contract alpha
 
-            Realized WAR × the signing-offseason market price of WAR, minus elapsed AAV-based cost.
-            Active contracts are measured only through 2025.
+            Realized WAR × the relevant season's empirical market price of WAR, minus elapsed
+            AAV-based cost. The displayed estimate is the base case; results are repeated at 75%
+            and 125% of that $/WAR value. Active contracts are measured only through 2025.
 
             #### Primary cohort
 
@@ -458,7 +586,14 @@ with method_tab:
             #### Pricing benchmark
 
             Ridge models use sustainable, pre-signing-only features and expanding-window validation.
-            No post-signing variable is available to the model at prediction time.
+            No post-signing variable is available to the model at prediction time. The result is a
+            baseline-price residual, not a fair-value appraisal; \\$100M+ contracts are outside the
+            model's reliable range unusually often.
+
+            #### Persistence
+
+            The primary estimate is the share of spike WAR associated with future WAR per season.
+            The percentage that faded is one minus that estimate, not an independent result.
             """
         )
     st.markdown("#### Important limits")
@@ -466,7 +601,7 @@ with method_tab:
         st.markdown(f"- {limitation}")
     st.write(
         "The app does not run ingestion at startup. Committed output files are reproducible with the "
-        "Phase 2 pipeline; full row-level outputs remain local-only pending redistribution permission."
+        "analysis pipeline; full row-level outputs remain local-only pending redistribution permission."
     )
     st.markdown(
         "[Read the full methodology](https://github.com/zaynr13/contract-alpha/blob/main/docs/methodology.md)"
