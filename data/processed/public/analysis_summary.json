@@ -1,0 +1,365 @@
+{
+  "answers": {
+    "A_price": {
+      "ci_high": 0.4232364869436834,
+      "ci_low": 0.33930963299195055,
+      "estimate": 0.38127305996781696,
+      "evidence": "clear positive association",
+      "n": 434,
+      "p_value": 6.098702276331165e-71
+    },
+    "B_persistence": {
+      "ci_high": 0.4293510171273687,
+      "ci_low": 0.18908323756727996,
+      "estimate": 0.3092171273473243,
+      "evidence": "clear positive association",
+      "n": 434,
+      "p_value": 4.537169610997834e-07
+    },
+    "B_regression": {
+      "ci_high": -0.5706489828745717,
+      "ci_low": -0.8109167624349783,
+      "estimate": -0.690782872654775,
+      "evidence": "clear negative association",
+      "n": 434,
+      "p_value": 1.8412560793058097e-29
+    },
+    "C_alpha": {
+      "ci_high": -0.06990943018332751,
+      "ci_low": -1.732426850927312,
+      "estimate": -0.9011681405553197,
+      "evidence": "clear negative association",
+      "n": 434,
+      "p_value": 0.03360018706124525
+    },
+    "D_residual": {
+      "ci_high": 0.12628328643148978,
+      "ci_low": -0.9594497411859366,
+      "estimate": -0.4165832273772234,
+      "evidence": "directional, but statistically uncertain",
+      "n": 376,
+      "p_value": 0.13256624238820858
+    }
+  },
+  "baseline_history_sensitivity": [
+    {
+      "ci_high": 0.4232,
+      "ci_low": 0.3393,
+      "clusters": 300,
+      "estimate": 0.3813,
+      "focal_variable": "performance_spike",
+      "minimum_observed_baseline_seasons": 1,
+      "n": 434,
+      "outcome": "log_guarantee",
+      "p_value": 0.0,
+      "question": "A_price",
+      "r_squared": 0.6472,
+      "standard_error": 0.0214
+    },
+    {
+      "ci_high": 0.4294,
+      "ci_low": 0.1891,
+      "clusters": 300,
+      "estimate": 0.3092,
+      "focal_variable": "performance_spike",
+      "minimum_observed_baseline_seasons": 1,
+      "n": 434,
+      "outcome": "future_war_per_season",
+      "p_value": 0.0,
+      "question": "B_persistence",
+      "r_squared": 0.2801,
+      "standard_error": 0.0613
+    },
+    {
+      "ci_high": -0.0699,
+      "ci_low": -1.7324,
+      "clusters": 300,
+      "estimate": -0.9012,
+      "focal_variable": "performance_spike",
+      "minimum_observed_baseline_seasons": 1,
+      "n": 434,
+      "outcome": "alpha_per_year_m",
+      "p_value": 0.0336,
+      "question": "C_alpha",
+      "r_squared": 0.0684,
+      "standard_error": 0.4241
+    },
+    {
+      "ci_high": 0.4233,
+      "ci_low": 0.3387,
+      "clusters": 299,
+      "estimate": 0.381,
+      "focal_variable": "performance_spike",
+      "minimum_observed_baseline_seasons": 2,
+      "n": 429,
+      "outcome": "log_guarantee",
+      "p_value": 0.0,
+      "question": "A_price",
+      "r_squared": 0.6489,
+      "standard_error": 0.0216
+    },
+    {
+      "ci_high": 0.4319,
+      "ci_low": 0.1905,
+      "clusters": 299,
+      "estimate": 0.3112,
+      "focal_variable": "performance_spike",
+      "minimum_observed_baseline_seasons": 2,
+      "n": 429,
+      "outcome": "future_war_per_season",
+      "p_value": 0.0,
+      "question": "B_persistence",
+      "r_squared": 0.2837,
+      "standard_error": 0.0616
+    },
+    {
+      "ci_high": -0.0478,
+      "ci_low": -1.7152,
+      "clusters": 299,
+      "estimate": -0.8815,
+      "focal_variable": "performance_spike",
+      "minimum_observed_baseline_seasons": 2,
+      "n": 429,
+      "outcome": "alpha_per_year_m",
+      "p_value": 0.0382,
+      "question": "C_alpha",
+      "r_squared": 0.0685,
+      "standard_error": 0.4254
+    },
+    {
+      "ci_high": 0.425,
+      "ci_low": 0.3339,
+      "clusters": 272,
+      "estimate": 0.3794,
+      "focal_variable": "performance_spike",
+      "minimum_observed_baseline_seasons": 3,
+      "n": 385,
+      "outcome": "log_guarantee",
+      "p_value": 0.0,
+      "question": "A_price",
+      "r_squared": 0.6615,
+      "standard_error": 0.0232
+    },
+    {
+      "ci_high": 0.4454,
+      "ci_low": 0.1878,
+      "clusters": 272,
+      "estimate": 0.3166,
+      "focal_variable": "performance_spike",
+      "minimum_observed_baseline_seasons": 3,
+      "n": 385,
+      "outcome": "future_war_per_season",
+      "p_value": 0.0,
+      "question": "B_persistence",
+      "r_squared": 0.2889,
+      "standard_error": 0.0657
+    },
+    {
+      "ci_high": 0.0556,
+      "ci_low": -1.6657,
+      "clusters": 272,
+      "estimate": -0.805,
+      "focal_variable": "performance_spike",
+      "minimum_observed_baseline_seasons": 3,
+      "n": 385,
+      "outcome": "alpha_per_year_m",
+      "p_value": 0.0668,
+      "question": "C_alpha",
+      "r_squared": 0.0761,
+      "standard_error": 0.4391
+    }
+  ],
+  "cohort": {
+    "forward_priced_primary_contracts": 376,
+    "primary_contracts_ge_5m": 465,
+    "primary_modelable_contracts": 434,
+    "primary_with_three_baseline_seasons": 385,
+    "primary_with_two_baseline_seasons": 429,
+    "research_contracts_ge_1m": 844
+  },
+  "contract_size_validation": [
+    {
+      "contract_size_band": "$1M\u2013<$5M",
+      "empirical_interval_coverage_percent": 72.449,
+      "mae": 4004544.5836,
+      "mean_absolute_log_error": 0.9961,
+      "median_absolute_error": 2869467.0815,
+      "median_absolute_percentage_error": 141.2296,
+      "n": 294
+    },
+    {
+      "contract_size_band": "$5M\u2013<$25M",
+      "empirical_interval_coverage_percent": 83.9695,
+      "mae": 7177281.1774,
+      "mean_absolute_log_error": 0.722,
+      "median_absolute_error": 5129018.1453,
+      "median_absolute_percentage_error": 53.1449,
+      "n": 262
+    },
+    {
+      "contract_size_band": "$25M\u2013<$100M",
+      "empirical_interval_coverage_percent": 56.3218,
+      "mae": 33070483.973,
+      "mean_absolute_log_error": 1.3242,
+      "median_absolute_error": 27234680.9937,
+      "median_absolute_percentage_error": 71.9669,
+      "n": 87
+    },
+    {
+      "contract_size_band": "$100M+",
+      "empirical_interval_coverage_percent": 37.037,
+      "mae": 151297057.2583,
+      "mean_absolute_log_error": 1.7082,
+      "median_absolute_error": 122181028.1104,
+      "median_absolute_percentage_error": 78.4597,
+      "n": 27
+    }
+  ],
+  "generated_at_utc": "2026-09-17T22:24:17.631165+00:00",
+  "interpretation": {
+    "persistence_estimate": "The persistence coefficient is the primary finding: the share of one additional spike WAR associated with future WAR per season. The percentage that faded is one minus this estimate, not a separate model.",
+    "price_estimate": "The guarantee coefficient is a conditional association, not a causal return to one additional WAR.",
+    "price_prediction": "The predicted guarantee is a sustainable-baseline benchmark with a wide empirical interval, not a fair-value appraisal or proof that a club overpaid.",
+    "years_prediction": "Contract-length predictions are reported for validation transparency but should not be used because they did not beat the role-median baseline."
+  },
+  "limitations": [
+    "AAV approximates annual cost and omits deferrals, options, trades, releases, and retained salary.",
+    "Market $/WAR is estimated from recent free-agent AAV divided by sustainable baseline WAR.",
+    "The six-offseason window is short; results are descriptive, not causal.",
+    "Historical public projections are unavailable, so expected performance uses a transparent historical baseline.",
+    "Unobserved baseline rows are not imputed as zero; observed baseline weights are renormalized, and results are repeated for one, two, and three observed seasons.",
+    "WAR measures on-field contribution, not commercial or total financial value."
+  ],
+  "market_price_per_war": [
+    {
+      "contracts": 50,
+      "market_dollars_per_war": 5391451.1,
+      "method": "median winsorized AAV / sustainable baseline WAR",
+      "p25": 3538402.07,
+      "p75": 7017495.44,
+      "season": 2020
+    },
+    {
+      "contracts": 54,
+      "market_dollars_per_war": 3872565.03,
+      "method": "median winsorized AAV / sustainable baseline WAR",
+      "p25": 3277798.93,
+      "p75": 5476828.33,
+      "season": 2021
+    },
+    {
+      "contracts": 60,
+      "market_dollars_per_war": 5081293.7,
+      "method": "median winsorized AAV / sustainable baseline WAR",
+      "p25": 3641633.58,
+      "p75": 7396858.93,
+      "season": 2022
+    },
+    {
+      "contracts": 71,
+      "market_dollars_per_war": 6033061.76,
+      "method": "median winsorized AAV / sustainable baseline WAR",
+      "p25": 4067260.0,
+      "p75": 8677859.55,
+      "season": 2023
+    },
+    {
+      "contracts": 46,
+      "market_dollars_per_war": 6655781.27,
+      "method": "median winsorized AAV / sustainable baseline WAR",
+      "p25": 4221730.05,
+      "p75": 8575226.54,
+      "season": 2024
+    },
+    {
+      "contracts": 63,
+      "market_dollars_per_war": 6954337.05,
+      "method": "median winsorized AAV / sustainable baseline WAR",
+      "p25": 4349174.97,
+      "p75": 9191281.08,
+      "season": 2025
+    }
+  ],
+  "market_value_sensitivity": [
+    {
+      "ci_high": -0.6043,
+      "ci_low": -1.9513,
+      "clusters": 300,
+      "contract_year_traps": 109,
+      "estimate": -1.2778,
+      "market_value_multiplier": 0.75,
+      "n": 434,
+      "negative_alpha_contracts": 358,
+      "p_value": 0.0002,
+      "positive_alpha_top10_overlap_with_base": 5,
+      "r_squared": 0.1867,
+      "scenario": "low",
+      "standard_error": 0.3436,
+      "trap_top10_overlap_with_base": 8,
+      "value_destruction_top10_overlap_with_base": 9
+    },
+    {
+      "ci_high": -0.0699,
+      "ci_low": -1.7324,
+      "clusters": 300,
+      "contract_year_traps": 93,
+      "estimate": -0.9012,
+      "market_value_multiplier": 1.0,
+      "n": 434,
+      "negative_alpha_contracts": 310,
+      "p_value": 0.0336,
+      "positive_alpha_top10_overlap_with_base": 10,
+      "r_squared": 0.0684,
+      "scenario": "base",
+      "standard_error": 0.4241,
+      "trap_top10_overlap_with_base": 10,
+      "value_destruction_top10_overlap_with_base": 10
+    },
+    {
+      "ci_high": 0.4769,
+      "ci_low": -1.526,
+      "clusters": 300,
+      "contract_year_traps": 87,
+      "estimate": -0.5246,
+      "market_value_multiplier": 1.25,
+      "n": 434,
+      "negative_alpha_contracts": 290,
+      "p_value": 0.3046,
+      "positive_alpha_top10_overlap_with_base": 8,
+      "r_squared": 0.0277,
+      "scenario": "high",
+      "standard_error": 0.5109,
+      "trap_top10_overlap_with_base": 10,
+      "value_destruction_top10_overlap_with_base": 9
+    }
+  ],
+  "method": {
+    "alpha": "realized WAR times offseason-specific market $/WAR minus AAV-based elapsed cost",
+    "inference": "OLS with offseason fixed effects and player-clustered standard errors",
+    "market_value_sensitivity": "realized alpha repeated at 75%, 100%, and 125% of the empirical offseason market $/WAR estimate",
+    "price_model": "ridge regression using sustainable pre-contract baseline features; strictly forward offseason testing",
+    "shortened_2020": "WAR and playing time scaled to 162 games for signal models; 2020 cost prorated 60/162 for realized alpha",
+    "spike": "162-game-equivalent contract-year WAR minus a 50/30/20 prior-three-season baseline renormalized over observed MLB rows"
+  },
+  "scope": "2020-2025 free-agent contracts; realized through 2025",
+  "validation": {
+    "aav": {
+      "beats_naive": true,
+      "test_contracts": 670,
+      "weighted_mae": 4049752.2292188494,
+      "weighted_naive_mae": 5239921.847780578
+    },
+    "contract_years": {
+      "beats_naive": false,
+      "test_contracts": 670,
+      "weighted_mae": 0.7341862824063318,
+      "weighted_naive_mae": 0.6507462686567165
+    },
+    "guaranteed_dollars": {
+      "beats_naive": true,
+      "test_contracts": 670,
+      "weighted_mae": 14955128.996535348,
+      "weighted_naive_mae": 17210506.08507463
+    }
+  }
+}
