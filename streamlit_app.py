@@ -1,4 +1,4 @@
-"""Findings-led Contract Alpha research application."""
+"""Findings-led MLB Contract-Year Trap research application."""
 
 from __future__ import annotations
 
@@ -84,7 +84,7 @@ def team_frame(frame: pd.DataFrame, scenario: str) -> pd.DataFrame:
     )
 
 
-st.set_page_config(page_title="Contract Alpha — MLB contract returns", page_icon="⚾", layout="wide")
+st.set_page_config(page_title="MLB Contract-Year Trap — MLB contract returns", page_icon="⚾", layout="wide")
 st.markdown(
     """
     <style>
@@ -94,15 +94,14 @@ st.markdown(
     .hero { font-size: clamp(2.7rem, 6vw, 5.5rem); font-weight: 790; letter-spacing: -.055em; line-height: .94; margin: .5rem 0 1rem; }
     .dek { color: #bec8d1; font-size: 1.16rem; line-height: 1.6; max-width: 59rem; }
     .scope { display: inline-block; margin-top: 1rem; padding: .38rem .72rem; border: 1px solid #ffb34d80; border-radius: 999px; color: #ffd59e; background: #ffb34d10; font-size: .78rem; font-weight: 750; }
-    .finding { min-height: 8.7rem; padding: 1rem 1.05rem; border: 1px solid #293846; border-radius: 14px; background: #121b24cc; }
-    .finding-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1rem; }
+    .finding { min-width: 0; min-height: 8.7rem; padding: 1rem 1.05rem; border: 1px solid #293846; border-radius: 14px; background: #121b24cc; box-sizing: border-box; overflow-wrap: anywhere; }
+    .finding-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; width: 100%; max-width: 100%; box-sizing: border-box; }
     .finding-kicker { color: #8ea1b2; font-size: .74rem; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; }
     .finding-value { color: #f5f1e8; font-size: 1.65rem; font-weight: 760; margin: .3rem 0; }
     .finding-copy { color: #b9c4cd; font-size: .86rem; line-height: 1.45; }
     .callout { border-left: 3px solid #ffb34d; padding: .85rem 1rem; background: #ffb34d0b; color: #dce2e7; }
     [data-testid="stMetric"] { background: #121b24cc; border: 1px solid #293846; border-radius: 14px; padding: .9rem; }
     div[data-testid="stExpander"] { border-color: #293846; }
-    @media (max-width: 1100px) { .finding-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
     @media (max-width: 650px) { .finding-grid { grid-template-columns: 1fr; } .finding { min-height: auto; } }
     </style>
     """,
@@ -133,9 +132,9 @@ persistence_percent = 100 * persistence["estimate"]
 faded_percent = 100 - persistence_percent
 
 st.markdown('<div class="eyebrow">MLB free-agent pricing and returns</div>', unsafe_allow_html=True)
-st.markdown('<div class="hero">Contract Alpha</div>', unsafe_allow_html=True)
+st.markdown('<div class="hero">MLB Contract-Year Trap</div>', unsafe_allow_html=True)
 st.markdown(
-    '<div class="dek">Did teams pay for sustainable talent—or for the perfect contract year? '
+    '<div class="dek">Do teams pay for sustainable talent—or the perfect contract year? '
     "This study follows 2020–2025 free agents from pre-signing performance through the value "
     "they delivered after signing.</div>",
     unsafe_allow_html=True,
